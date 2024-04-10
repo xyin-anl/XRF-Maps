@@ -176,6 +176,26 @@ void Spectra_Volume<T_real>::generate_scaler_maps(std::vector<Scaler_Map<T_real>
 
 // ----------------------------------------------------------------------------
 
+template<typename T_real>
+Eigen::Tensor<T_real, 3> Spectra_Volume<T_real>::get_sv_tensor()
+{
+    Eigen::Tensor<T_real, 3> data(_data_vol.size(), _data_vol[0].size(), _data_vol[0][0].size());
+    // Basic for loop implementation, potential better way via casting/mapping
+    for (size_t i = 0; i < _data_vol.size(); i++)
+    {
+        for (size_t j = 0; j < _data_vol[0].size(); j++)
+        {
+            for (size_t k = 0; k < _data_vol[0][0].size(); k++)
+            {
+                data(i, j, k) = _data_vol[i][j][k];
+            }
+        }
+    }
+    return data;
+}
+
+// ----------------------------------------------------------------------------
+
 TEMPLATE_CLASS_DLL_EXPORT Spectra_Volume<float>;
 TEMPLATE_CLASS_DLL_EXPORT Spectra_Volume<double>;
 
