@@ -118,6 +118,128 @@ DLL_EXPORT void save_optimized_fit_params(std::string dataset_dir, std::string d
 //DLL_EXPORT void sort_dataset_files_by_size(std::string dataset_directory, std::vector<std::string>* dataset_files);
 
 // ----------------------------------------------------------------------------
+template<typename T_real>
+DLL_EXPORT void save_optimized_fit_params_(std::string dataset_dir, std::string dataset_filename, int detector_num, std::string result, data_struct::Fit_Parameters<T_real> *fit_params, const data_struct::Spectra<T_real>* const spectra, const data_struct::Fit_Element_Map_Dict<T_real>* const elements_to_fit)
+{
+    std::string full_path = dataset_dir + DIR_END_CHAR + "output" + DIR_END_CHAR + dataset_filename;
+    std::string mca_full_path = dataset_dir + DIR_END_CHAR + "output" + DIR_END_CHAR + "intspec_" + dataset_filename;
+    std::string fp_full_path = dataset_dir + DIR_END_CHAR + "output" + DIR_END_CHAR + "fit_param_" + dataset_filename;
+    
+    if (detector_num != -1)
+    {
+        full_path += std::to_string(detector_num) + ".csv";
+        mca_full_path += std::to_string(detector_num) + ".mca";
+        fp_full_path += std::to_string(detector_num) + ".csv";
+    }
+    else
+    {
+        full_path += ".csv";
+        mca_full_path += ".txt";
+        fp_full_path += ".txt";
+    }
+    logI<<full_path<<"\n";
+
+    if (fit_params == nullptr)
+    {
+        logE << "Fit Parameters == nullptr. Can not save!\n";
+		return;
+    }
+	else
+	{
+		if (fit_params->size() == 0)
+		{
+			logE << "Fit Parameters size = 0. Can not save!\n";
+			return;
+		}
+	}
+
+    if (spectra == nullptr)
+    {
+        logE << "int Spectra == nullptr. Can not save!\n";
+		return;
+    }
+
+    if (elements_to_fit == nullptr)
+    {
+        logE << "Elements to Fit == nullptr. Can not save!\n";
+		return;
+    }
+
+    fitting::models::Gaussian_Model<T_real> model;
+    //Range of energy in spectra to fit
+    fitting::models::Range energy_range = data_struct::get_energy_range(spectra->size(), fit_params);
+    data_struct::Spectra<T_real> snip_spectra = spectra->sub_spectra(energy_range.min, energy_range.count());
+
+    std::unordered_map<std::string, ArrayTr<T_real>> labeled_spectras;
+    data_struct::Spectra<T_real> model_spectra = model.model_spectrum(fit_params, elements_to_fit, &labeled_spectras, energy_range);
+    
+    data_struct::ArrayTr<T_real> background;
+
+    T_real energy_offset = fit_params->value(STR_ENERGY_OFFSET);
+    T_real energy_slope = fit_params->value(STR_ENERGY_SLOPE);
+    T_real energy_quad = fit_params->value(STR_ENERGY_QUADRATIC);
+
+    data_struct::ArrayTr<T_real> energy = data_struct::ArrayTr<T_real>::LinSpaced(energy_range.count(), energy_range.min, energy_range.max);
+    data_struct::ArrayTr<T_real> ev = energy_offset + (energy * energy_slope) + (Eigen::pow(energy, (T_real)2.0) * energy_quad);
+    
+    if (fit_params->contains(STR_SNIP_WIDTH))
+	{
+        data_struct::ArrayTr<T_real> s_background = data_struct::snip_background<T_real>(spectra,
+                                                                        fit_params->value(STR_ENERGY_OFFSET),
+                                                                        fit_params->value(STR_ENERGY_SLOPE),
+                                                                        fit_params->value(STR_ENERGY_QUADRATIC),
+                                                                        fit_params->value(STR_SNIP_WIDTH),
+                                                                        energy_range.min,
+                                                                        energy_range.max);
+        if (s_background.size() >= energy_range.count())
+        {
+            background = s_background.segment(energy_range.min, energy_range.count());
+            model_spectra += background;
+        }
+        if (background.size() == 0)
+        {
+            background.resize(energy_range.count());
+            background.setZero();
+        }
+	}
+    else
+    {
+        background.resize(energy_range.count());
+        background.setZero();
+    }
+
+    std::string str_path = dataset_dir + "/output/fit_" + dataset_filename + "_det";
+    if (detector_num != -1)
+    {
+        str_path += std::to_string(detector_num) + ".png";
+    }
+    else
+    {
+        str_path += ".png";
+    }
+    #ifdef _BUILD_WITH_QT
+    visual::SavePlotSpectrasFromConsole(str_path, &ev, &snip_spectra, &model_spectra, &background, true);
+    #endif
+    for (const auto& eitr : *elements_to_fit)
+    {
+        if (fit_params->contains(eitr.first))
+        {
+            T_real val = (*fit_params)[eitr.first].value;
+            val = pow(10.0, val);
+            (*fit_params)[eitr.first].value = val;
+        }
+    }
+
+    io::file::csv::save_fit_and_int_spectra(full_path, &ev, &snip_spectra, &model_spectra, &background, &labeled_spectras);
+    io::file::aps::save_fit_parameters_override(fp_full_path, *fit_params, result);
+    std::unordered_map<std::string, T_real> scaler_map;
+    scaler_map[STR_ENERGY_OFFSET] = energy_offset;
+    scaler_map[STR_ENERGY_SLOPE] = energy_slope;
+    scaler_map[STR_ENERGY_QUADRATIC] = energy_quad;
+    io::file::mca::save_integrated_spectra(mca_full_path, spectra, scaler_map);
+
+}
+
 
 template<typename T_real>
 void cb_load_spectra_data_helper(size_t row, size_t col, size_t height, size_t width, size_t detector_num, data_struct::Spectra<T_real>* spectra, void* user_data)
