@@ -1036,7 +1036,7 @@ DLL_EXPORT bool load_spectra_volume(std::string dataset_directory,
     {
         logI << "Loaded spectra volume from h5.\n";
         *is_loaded_from_analyazed_h5 = true;
-        return io::file::HDF5_IO::inst()->start_save_seq(false);
+        return io::file::HDF5_IO::inst()->start_save_seq(fullpath, false, false);
     }
     else
     {
