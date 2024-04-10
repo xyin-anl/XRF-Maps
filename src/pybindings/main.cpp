@@ -119,8 +119,12 @@ PYBIND11_MODULE(pyxrfmaps, m) {
     .value("NNLS", data_struct::Fitting_Routines::NNLS);
 
     //data structures
-    /*
-    py::class_<data_struct::Spectra, data_struct::ArrayXr>(m, "Spectra", py::buffer_protocol())
+    py::class_<data_struct::Scaler_Map<float>>(m, "Scaler_Map")
+        .def(py::init<>())
+        .def_readwrite("name", &data_struct::Scaler_Map<float>::name)
+        .def_readwrite("unit", &data_struct::Scaler_Map<float>::unit)
+        .def_readwrite("time_normalized", &data_struct::Scaler_Map<float>::time_normalized)
+        .def_readwrite("values", &data_struct::Scaler_Map<float>::values);
     //py::class_<data_struct::Spectra, data_struct::ArrayXr>(m, "Spectra")
         .def(py::init<size_t>())
         .def("add", &data_struct::Spectra::add)
@@ -166,7 +170,12 @@ PYBIND11_MODULE(pyxrfmaps, m) {
         })
         .def("resize_and_zero", &data_struct::Spectra_Volume<float>::resize_and_zero)
         .def("integrate", &data_struct::Spectra_Volume<float>::integrate)
-        .def("generate_scaler_maps", &data_struct::Spectra_Volume<float>::generate_scaler_maps)
+        // .def("generate_scaler_maps", &data_struct::Spectra_Volume<float>::generate_scaler_maps)
+        .def("generate_scaler_maps", [](data_struct::Spectra_Volume<float>&self){
+            std::vector<data_struct::Scaler_Map<float>> scaler_maps;
+            self.generate_scaler_maps(&scaler_maps);
+            return scaler_maps;
+        })
         .def("cols", &data_struct::Spectra_Volume<float>::cols)
         .def("rows", &data_struct::Spectra_Volume<float>::rows)
         .def("recalc_elapsed_livetime", &data_struct::Spectra_Volume<float>::recalc_elapsed_livetime)
