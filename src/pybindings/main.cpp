@@ -933,7 +933,7 @@ PYBIND11_MODULE(pyxrfmaps, m) {
 //    m.def("run_stream_pipeline", &run_stream_pipeline);
 
     //process_whole
-    //m.def("generate_fit_count_dict", &generate_fit_count_dict<real_t>);
+    m.def("generate_fit_count_dict", &generate_fit_count_dict<float>);
     m.def("fit_single_spectra", &fit_single_spectra<float>);
    // m.def("optimize_integrated_fit_params", &optimize_integrated_fit_params);
     m.def("generate_optimal_params", &generate_optimal_params);
