@@ -845,7 +845,56 @@ PYBIND11_MODULE(pyxrfmaps, m) {
                                                                                   user_data);
                                  });
 
-
+    //HDF5_IO
+    io_file.def("hdf5_start_save_seq", [](std::string path,
+                                          bool force_new_file,
+                                          bool open_file_only)
+                {
+                    return io::file::HDF5_IO::inst()->start_save_seq(path, force_new_file, open_file_only);
+                });
+    io_file.def("hdf5_get_filename", []()
+                {
+                    return io::file::HDF5_IO::inst()->get_filename();
+                });
+    io_file.def("hdf5_set_filename", [](std::string path)
+                {
+                    return io::file::HDF5_IO::inst()->set_filename(path);
+                });
+    io_file.def("hdf5_save_energy_calib", [](int spectra_size, 
+                                             float energy_offset,
+                                             float energy_slope,
+                                             float energy_quad)
+                {
+                    return io::file::HDF5_IO::inst()->save_energy_calib<float>(spectra_size, energy_offset, energy_slope, energy_quad);
+                });
+    io_file.def("hdf5_save_params_override", [](data_struct::Params_Override<float>* params_override)
+                {
+                    return io::file::HDF5_IO::inst()->save_params_override<float>(params_override);
+                });
+    io_file.def("hdf5_save_fitted_int_spectra", [](std::string path,
+                                                   data_struct::Spectra<float>& spectra,
+                                                   data_struct::Range& range,
+                                                   data_struct::Spectra<float>& background,
+                                                   size_t save_spectra_size)
+                {
+                    return io::file::HDF5_IO::inst()->save_fitted_int_spectra<float>(path, spectra, range, background, save_spectra_size);
+                });
+    io_file.def("hdf5_save_element_fits", [](std::string path,
+                                             data_struct::Fit_Count_Dict<float>* element_counts, 
+                                             size_t row_idx_start, int row_idx_end, size_t col_idx_start, int col_idx_end)
+                {
+                    return io::file::HDF5_IO::inst()->save_element_fits<float>(path, element_counts, row_idx_start, row_idx_end, col_idx_start, col_idx_end);
+                });
+    io_file.def("hdf5_save_spectra_volume", [](std::string path,
+                                               data_struct::Spectra_Volume<float>* spectra_volume,
+                                               size_t row_idx_start, int row_idx_end, size_t col_idx_start, int col_idx_end)
+                {
+                    return io::file::HDF5_IO::inst()->save_spectra_volume<float>(path, spectra_volume, row_idx_start, row_idx_end, col_idx_start, col_idx_end);
+                });
+    io_file.def("hdf5_end_save_seq", [](bool loginfo)
+            {
+                return io::file::HDF5_IO::inst()->end_save_seq(loginfo);
+            });
 
     //workflow
     py::class_<workflow::Sink<data_struct::Stream_Block<float>*> >(workflow, "StreamBlockSink")
