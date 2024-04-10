@@ -125,31 +125,32 @@ PYBIND11_MODULE(pyxrfmaps, m) {
         .def_readwrite("unit", &data_struct::Scaler_Map<float>::unit)
         .def_readwrite("time_normalized", &data_struct::Scaler_Map<float>::time_normalized)
         .def_readwrite("values", &data_struct::Scaler_Map<float>::values);
-    //py::class_<data_struct::Spectra, data_struct::ArrayXr>(m, "Spectra")
-        .def(py::init<size_t>())
-        .def("add", &data_struct::Spectra::add)
-        .def("recalc_elapsed_livetime", &data_struct::Spectra::recalc_elapsed_livetime)
-        .def("set_elapsed_livetime", (void (data_struct::Spectra::*)(real_t)) &data_struct::Spectra::elapsed_livetime )
-        .def("get_elapsed_livetime", (const real_t (data_struct::Spectra::*)() const) &data_struct::Spectra::elapsed_livetime)
-        .def("set_elapsed_realtime", (void (data_struct::Spectra::*)(real_t)) &data_struct::Spectra::elapsed_realtime )
-        .def("get_elapsed_realtime", (const real_t (data_struct::Spectra::*)() const) &data_struct::Spectra::elapsed_realtime)
-        .def("set_input_counts", (void (data_struct::Spectra::*)(real_t)) &data_struct::Spectra::input_counts )
-        .def("get_input_counts", (const real_t (data_struct::Spectra::*)() const) &data_struct::Spectra::input_counts)
-        .def("set_output_counts", (void (data_struct::Spectra::*)(real_t)) &data_struct::Spectra::output_counts )
-        .def("get_output_counts", (const real_t (data_struct::Spectra::*)() const) &data_struct::Spectra::output_counts)
-        .def("sub_spectra", &data_struct::Spectra::sub_spectra);
 
-        .def_buffer([](data_struct::Spectra &m) -> py::buffer_info {
+    py::class_<data_struct::Spectra<float>>(m, "Spectra", py::buffer_protocol())
+    //py::class_<data_struct::Spectra, data_struct::ArrayXr>(m, "Spectra")
+        .def(py::init<>())
+        // .def("add", &data_struct::Spectra<float>::add)
+        .def("recalc_elapsed_livetime", &data_struct::Spectra<float>::recalc_elapsed_livetime)
+        .def("set_elapsed_livetime", (void (data_struct::Spectra<float>::*)(float)) &data_struct::Spectra<float>::elapsed_livetime )
+        .def("get_elapsed_livetime", (const float (data_struct::Spectra<float>::*)() const) &data_struct::Spectra<float>::elapsed_livetime)
+        .def("set_elapsed_realtime", (void (data_struct::Spectra<float>::*)(float)) &data_struct::Spectra<float>::elapsed_realtime )
+        .def("get_elapsed_realtime", (const float (data_struct::Spectra<float>::*)() const) &data_struct::Spectra<float>::elapsed_realtime)
+        .def("set_input_counts", (void (data_struct::Spectra<float>::*)(float)) &data_struct::Spectra<float>::input_counts )
+        .def("get_input_counts", (const float (data_struct::Spectra<float>::*)() const) &data_struct::Spectra<float>::input_counts)
+        .def("set_output_counts", (void (data_struct::Spectra<float>::*)(float)) &data_struct::Spectra<float>::output_counts )
+        .def("get_output_counts", (const float (data_struct::Spectra<float>::*)() const) &data_struct::Spectra<float>::output_counts)
+        .def("sub_spectra", &data_struct::Spectra<float>::sub_spectra)
+        .def_buffer([](data_struct::Spectra<float> &m) -> py::buffer_info {
                 return py::buffer_info(
                     m.data(),                               // Pointer to buffer
-                    sizeof(real_t),                          // Size of one scalar
-                    py::format_descriptor<real_t>::format(), // Python struct-style format descriptor
+                    sizeof(float),                          // Size of one scalar
+                    py::format_descriptor<float>::format(), // Python struct-style format descriptor
                     1,                                      // Number of dimensions
                     { m.size() },                 // Buffer dimensions
-                    { sizeof(real_t) }             // Strides (in bytes) for each index
+                    { sizeof(float) }             // Strides (in bytes) for each index
                 );
             });
-*/
+
 
     py::class_<data_struct::Spectra_Line<float>>(m, "Spectra_Line", py::buffer_protocol())
         .def(py::init<>())
