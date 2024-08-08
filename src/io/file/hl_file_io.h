@@ -438,9 +438,10 @@ DLL_EXPORT bool init_analysis_job_detectors(data_struct::Analysis_Job<T_real>* a
             //Update fit parameters by override values
             detector->model->update_fit_params_values(&(override_params->fit_params));
 
+            // Don't know spectra size
             //Fit_Element_Map_Dict *elements_to_fit = &(detector->fit_params_override_dict.elements_to_fit);
             //Initialize model
-            //fit_routine->initialize(detector->model, elements_to_fit, energy_range);
+            //detector->fit_routines.at(proc_type)->initialize(detector->model, elements_to_fit, energy_range);
 
         }
     }
@@ -1049,7 +1050,16 @@ DLL_EXPORT bool load_spectra_volume(std::string dataset_directory,
         fullpath = dataset_directory + DIR_END_CHAR + dataset_file;
         std::string file_title;
         data_struct::Scan_Info<T_real> scan_info_edf;
-        if(true == io::file::HDF5_IO::inst()->load_spectra_vol_esrf(fullpath, file_title, spectra_volume, scan_info_edf))
+        // try new APS-U format
+        if(true == io::file::HDF5_IO::inst()->load_spectra_vol_apsu(fullpath, file_title, spectra_volume, scan_info_edf))
+        {
+            // load scan rows from ./flyXRF
+
+            // load positions from ./positions
+        
+        }
+        // try ESRF dataset
+        else if(true == io::file::HDF5_IO::inst()->load_spectra_vol_esrf(fullpath, file_title, spectra_volume, scan_info_edf))
         {
             std::string dset_folder = "";
             std::string base_name = dataset_file;

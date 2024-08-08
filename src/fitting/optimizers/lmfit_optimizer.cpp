@@ -64,7 +64,11 @@ namespace optimizers
 template<typename T_real>
 void residuals_lmfit( const T_real *par, int m_dat, const void *data, T_real *fvec, int *userbreak )
 {
+    bool first = true;
     User_Data<T_real>* ud = (User_Data<T_real>*)(data);
+    // Debug to find which param changed last
+    Fit_Parameters<T_real> prev_fit_p;
+    prev_fit_p.update_and_add_values(ud->fit_parameters);
 
     // Update fit parameters from optimizer
     ud->fit_parameters->from_array(par, m_dat);
@@ -74,19 +78,34 @@ void residuals_lmfit( const T_real *par, int m_dat, const void *data, T_real *fv
     // Add background
     ud->spectra_model += ud->spectra_background;
     // Remove nan's and inf's
-    // ud->spectra_model = (ArrayTr<T_real>)ud->spectra_model.unaryExpr([](T_real v) { return std::isfinite(v) ? v : (T_real)0.0; });
+    ud->spectra_model = (ArrayTr<T_real>)ud->spectra_model.unaryExpr([ud](T_real v) { return std::isfinite(v) ? v : ud->normalizer; });
 
     // Calculate residuals
     for (int i = 0; i < m_dat; i++ )
     {
-		fvec[i] = abs(ud->spectra[i] - ud->spectra_model[i]) * ud->weights[i];
+        T_real n_raw = ud->spectra[i] / ud->normalizer;
+        T_real n_model = ud->spectra_model[i] / ud->normalizer;
+        fvec[i] = pow((n_raw - n_model), (T_real)2.0) * ud->weights[i];
+		//fvec[i] = pow((ud->spectra[i] - ud->spectra_model[i]), (T_real)2.0) * ud->weights[i];
 		if (std::isfinite(fvec[i]) == false)
 		{
-			//logE << "\n\n\n";
-			logE << "Spectra[i] = " << ud->spectra[i] << " :: spectra_model[i] = " << ud->spectra_model[i] << "  ::  weights[i] = " << ud->weights[i];
-			//logE << "\n\n\n";
-			fvec[i] = ud->spectra[i] + ud->spectra_model[i];
-            //fvec[i] = std::numeric_limits<T_real>::quiet_NaN();
+            if(first)
+            {
+                logE << "Spectra["<<i<<"] = " << ud->spectra[i] << " ::spectra_model["<<i<<"] = " << ud->spectra_model[i] << "  ::weights["<<i<<"] = " << ud->weights[i]<<"\n";
+                logE<<" \n Diff Param \n";
+                for(auto &itr : prev_fit_p)
+                {
+                    if(itr.second.value != ud->fit_parameters->at(itr.first).value)
+                    {
+                        logE<<itr.first<<" : Old = "<<itr.second.value<<" ; New = "<< ud->fit_parameters->at(itr.first).value <<"\n";
+                    }
+                }
+                logE<<" \n \n";
+                ud->fit_parameters->print_non_fixed();
+			    first = false;
+            }
+            fvec[i] = ud->normalizer;
+			
 		}
     }
     
@@ -121,15 +140,19 @@ void general_residuals_lmfit( const T_real *par, int m_dat, const void *data, T_
     ud->spectra_model += ud->spectra_background;
     // Remove nan's and inf's
 	// Used to check for nan's here but there were some cases where the optimizer would return nan found. So moved to after subract of model
-    // ud->spectra_model = (ArrayTr<T_real>)ud->spectra_model.unaryExpr([](T_real v) { return std::isfinite(v) ? v : (T_real)0.0; });
+    ud->spectra_model = (ArrayTr<T_real>)ud->spectra_model.unaryExpr([ud](T_real v) { return std::isfinite(v) ? v : ud->normalizer; });
     
     // Calculate residuals
     for (int i = 0; i < m_dat; i++ )
     {
-        fvec[i] = abs( ud->spectra[i] - ud->spectra_model[i] ) * ud->weights[i];
+        //fvec[i] = pow(( ud->spectra[i] - ud->spectra_model[i] ), (T_real)2.0) * ud->weights[i];
+        T_real n_raw = ud->spectra[i] / ud->normalizer;
+        T_real n_model = ud->spectra_model[i] / ud->normalizer;
+        fvec[i] = pow((n_raw - n_model), (T_real)2.0) * ud->weights[i];
 		if (std::isfinite(fvec[i]) == false)
 		{
-			fvec[i] = ud->spectra[i] + ud->spectra_model[i];
+			//fvec[i] = ud->spectra[i] + ud->spectra_model[i];
+            fvec[i] = ud->normalizer;
 		}
     }
     
@@ -166,7 +189,7 @@ void quantification_residuals_lmfit( const T_real *par, int m_dat, const void *d
 		}
 		else
 		{
-			fvec[idx] = abs(itr.second.e_cal_ratio - result_map[itr.first]);
+			fvec[idx] = pow((itr.second.e_cal_ratio - result_map[itr.first]), (T_real)2.0);
 		}
         idx++;
     }
