@@ -82,7 +82,7 @@ using namespace fitting::models;
 
 //typedef std::function<void(const Fit_Parameters * const, const Range * const, Spectra*)> Gen_Func_Def;
 template<typename T_real>
-using Gen_Func_Def = std::function<void(const Fit_Parameters<T_real>* const, const Range* const, Spectra<T_real>*)>;
+using Gen_Func_Def = std::function<void(const Base_Model<T_real>* const model, const Fit_Parameters<T_real>* const, const Range* const, Spectra<T_real>*)>;
 
 enum class OPTIMIZER_OUTCOME{ FOUND_ZERO, CONVERGED, TRAPPED,  EXHAUSTED, FAILED, CRASHED, EXPLODED, STOPPED, FOUND_NAN, F_TOL_LT_TOL, X_TOL_LT_TOL, G_TOL_LT_TOL};
 
@@ -129,6 +129,7 @@ struct Gen_User_Data
         fit_parameters = nullptr;
     }
 
+    Base_Model<T_real>* fit_model;
     Spectra<T_real> spectra;
 	ArrayTr<T_real> weights;
     Fit_Parameters<T_real>*fit_parameters;
@@ -182,7 +183,7 @@ void fill_user_data(User_Data<T_real> &ud,
 
     ud.status_callback = status_callback;
     ud.cur_itr = 0;
-    ud.total_itr = total_itr * fit_params->size_non_fixed();
+    ud.total_itr = total_itr;
 
     if (use_weights)
     {
@@ -231,6 +232,7 @@ void fill_user_data(User_Data<T_real> &ud,
 template<typename T_real>
 void fill_gen_user_data(Gen_User_Data<T_real>& ud,
                         Fit_Parameters<T_real>* fit_params,
+                        const Base_Model<T_real>* const model,
                         const Spectra<T_real>* const spectra,
                         const Range energy_range,
                         const ArrayTr<T_real>* background,
@@ -238,6 +240,7 @@ void fill_gen_user_data(Gen_User_Data<T_real>& ud,
                         bool use_weights = true)
 {
     ud.func = gen_func;
+    ud.fit_model = (Base_Model<T_real>*)model;
     // set spectra to fit
     ud.spectra = spectra->sub_spectra(energy_range.min, energy_range.count());
     ArrayTr<T_real> norm_arr = ud.spectra.pow(2.0); // square the spectra and sum it
@@ -254,7 +257,7 @@ void fill_gen_user_data(Gen_User_Data<T_real>& ud,
         weights = convolve1d(weights, 5);
         weights = Eigen::abs(weights);
         weights /= weights.maxCoeff();
-        weights = weights.unaryExpr([](T_real v) { return std::isfinite(v) ? v : (T_real)0.0; });
+        weights = weights.unaryExpr([](T_real v) { return std::isfinite(v) ? v : (T_real)1.0; });
         ud.weights = weights.segment(energy_range.min, energy_range.count());
     }
     else
@@ -319,12 +322,13 @@ public:
                           bool use_weights,
                           Callback_Func_Status_Def* status_callback = nullptr) = 0;
 
-    virtual OPTIMIZER_OUTCOME minimize_func(Fit_Parameters<T_real>*fit_params,
-                               const Spectra<T_real>* const spectra,
-                               const Range energy_range,
-                               const ArrayTr<T_real>* background,
-                               Gen_Func_Def<T_real> gen_func,
-                               bool use_weights) = 0;
+    virtual OPTIMIZER_OUTCOME minimize_func(const Base_Model<T_real>* const model,
+                                            Fit_Parameters<T_real>*fit_params,
+                                            const Spectra<T_real>* const spectra,
+                                            const Range energy_range,
+                                            const ArrayTr<T_real>* background,
+                                            Gen_Func_Def<T_real> gen_func,
+                                            bool use_weights) = 0;
 
 
     virtual OPTIMIZER_OUTCOME minimize_quantification(Fit_Parameters<T_real>*fit_params,
@@ -332,6 +336,10 @@ public:
                                          quantification::models::Quantification_Model<T_real>* quantification_model) = 0;
 
     virtual std::unordered_map<std::string, T_real> get_options() = 0;
+    
+    virtual std::vector<std::string> get_algorithm_list() = 0;
+
+    virtual bool set_algorithm(std::string name) = 0;
 
     virtual void set_options(std::unordered_map<std::string, T_real> opt) = 0;
 

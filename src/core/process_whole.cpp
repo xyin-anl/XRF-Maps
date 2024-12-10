@@ -47,6 +47,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include "core/process_whole.h"
 #include <algorithm>
+#include <fitting/models/gaussian_model.h>
 
 using namespace std::placeholders; //for _1, _2,
 
@@ -83,7 +84,7 @@ bool optimize_integrated_fit_params(data_struct::Analysis_Job<double> * analysis
         }
 
         fit_routine->set_optimizer(analysis_job->optimizer());
-        fit_routine->set_update_coherent_amplitude_on_fit(false);
+        fit_routine->set_update_coherent_amplitude_on_fit(true);
 
         //reset model fit parameters to defaults
         model.reset_to_default_fit_params();
@@ -94,11 +95,10 @@ bool optimize_integrated_fit_params(data_struct::Analysis_Job<double> * analysis
             //set fixed/fit preset
             model.set_fit_params_preset(analysis_job->optimize_fit_params_preset);
         }
-
-        model.print_fit_params();
-
         //Initialize the fit routine
         fit_routine->initialize(&model, &params_override->elements_to_fit, energy_range);
+
+        model.print_fit_params();
 
         //Fit the spectra saving the element counts in element_fit_count_dict
         fitting::optimizers::OPTIMIZER_OUTCOME outcome = fit_routine->fit_spectra_parameters(&model, &int_spectra, &params_override->elements_to_fit, analysis_job->use_weights, out_fitp, status_callback);
@@ -126,7 +126,7 @@ bool optimize_integrated_fit_params(data_struct::Analysis_Job<double> * analysis
             ret_val = false;
             break;
         }
-        io::file::save_optimized_fit_params(analysis_job->dataset_directory, save_filename, detector_num, result, &out_fitp, &int_spectra, &(params_override->elements_to_fit));
+        io::file::save_optimized_fit_params(analysis_job->output_dir, save_filename, detector_num, result, &out_fitp, &int_spectra, &(params_override->elements_to_fit));
 
         delete fit_routine;
     }
@@ -145,7 +145,7 @@ void generate_optimal_params(data_struct::Analysis_Job<double>* analysis_job)
     data_struct::Params_Override<double>* params_override = nullptr;
     data_struct::Spectra<double> int_spectra;
 
-    std::string full_path = analysis_job->dataset_directory + DIR_END_CHAR + "maps_fit_parameters_override.txt";
+    std::string full_path = analysis_job->output_dir + DIR_END_CHAR + "maps_fit_parameters_override.txt";
 
     for (size_t detector_num : analysis_job->detector_num_arr)
     {
@@ -165,9 +165,9 @@ void generate_optimal_params(data_struct::Analysis_Job<double>* analysis_job)
             {
                 params_override = new data_struct::Params_Override<double>();
                 //load override parameters
-                if (false == io::file::load_override_params(analysis_job->dataset_directory, detector_num, params_override))
+                if (false == io::file::load_override_params(analysis_job->output_dir, detector_num, params_override))
                 {
-                    if (false == io::file::load_override_params(analysis_job->dataset_directory, -1, params_override))
+                    if (false == io::file::load_override_params(analysis_job->output_dir, -1, params_override))
                     {
                         logE << "Loading maps_fit_parameters_override.txt\n";
                         delete params_override;
@@ -255,16 +255,23 @@ void load_and_fit_quatification_datasets(data_struct::Analysis_Job<double>* anal
         for (auto& itr : standard_itr.element_standard_weights)
         {
             data_struct::Element_Info<double>* e_info = data_struct::Element_Info_Map<double>::inst()->get_element(itr.first);
-            elements_to_fit[itr.first] = new data_struct::Fit_Element_Map<double>(itr.first, e_info);
-            elements_to_fit[itr.first]->init_energy_ratio_for_detector_element(detector->detector_element, standard_itr.disable_Ka_for_quantification, standard_itr.disable_La_for_quantification);
-
-            if (element_amt_in_all_standards.count(e_info->number) > 0)
+            if( e_info != nullptr )
             {
-                element_amt_in_all_standards[e_info->number] += 1.0;
+                elements_to_fit[itr.first] = new data_struct::Fit_Element_Map<double>(itr.first, e_info);
+                elements_to_fit[itr.first]->init_energy_ratio_for_detector_element(detector->detector_element, standard_itr.disable_Ka_for_quantification, standard_itr.disable_La_for_quantification);
+
+                if (element_amt_in_all_standards.count(e_info->number) > 0)
+                {
+                    element_amt_in_all_standards[e_info->number] += 1.0;
+                }
+                else
+                {
+                    element_amt_in_all_standards[e_info->number] = 1.0;
+                }
             }
             else
             {
-                element_amt_in_all_standards[e_info->number] = 1.0;
+                logE<<"Could not find element: "<< itr.first <<"\n";
             }
         }
 
@@ -278,7 +285,7 @@ void load_and_fit_quatification_datasets(data_struct::Analysis_Job<double>* anal
             quantification_standard->standard_filename[fn_str_len - 1] == 'a')
         {
             //try with adding detector_num on the end for 2ide datasets
-            std::string qfilepath = analysis_job->dataset_directory + quantification_standard->standard_filename;
+            std::string qfilepath = analysis_job->output_dir + quantification_standard->standard_filename;
             if (detector_num != -1)
             {
                 qfilepath += std::to_string(detector_num);
@@ -386,19 +393,14 @@ void load_and_fit_quatification_datasets(data_struct::Analysis_Job<double>* anal
                 {
                     if (false == override_params->fit_params.contains(itr2.first))
                     {
-                        fit_params.add_parameter(Fit_Param<double>(itr2.first, 1.0e-11, 20.0, quantification_standard->element_counts.at(fit_itr.first).at(itr2.first), 0.0005, E_Bound_Type::LIMITED_LO_HI));
+                        fit_params.add_parameter(Fit_Param<double>(itr2.first, MIN_COUNTS_LIMIT_LOG, MAX_COUNTS_LIMIT_LOG, quantification_standard->element_counts.at(fit_itr.first).at(itr2.first), STEP_COUNTS_LIMIT_LOG, E_Bound_Type::LIMITED_LO_HI));
                     }
                 }
                 fitting::routines::Matrix_Optimized_Fit_Routine<double>* f_routine = (fitting::routines::Matrix_Optimized_Fit_Routine<double>*)fit_routine;
-                double energy_offset = fit_params.value(STR_ENERGY_OFFSET);
-                double energy_slope = fit_params.value(STR_ENERGY_SLOPE);
-                double energy_quad = fit_params.value(STR_ENERGY_QUADRATIC);
-
-                data_struct::ArrayTr<double> energy = data_struct::ArrayTr<double>::LinSpaced(energy_range.count(), energy_range.min, energy_range.max);
-                data_struct::ArrayTr<double> ev = energy_offset + (energy * energy_slope) + (Eigen::pow(energy, (double)2.0) * energy_quad);
+                const ArrayTr<double> ev = data_struct::generate_energy_array(energy_range, &fit_params);
                 data_struct::ArrayTr<double> sub_spectra = quantification_standard->integrated_spectra.segment(energy_range.min, energy_range.count());
 
-                std::string full_path = analysis_job->dataset_directory + DIR_END_CHAR + "output" + DIR_END_CHAR + "calib_" + fit_routine->get_name() + "_" + standard_itr.standard_filename;
+                std::string full_path = analysis_job->output_dir + DIR_END_CHAR + "output" + DIR_END_CHAR + "calib_" + fit_routine->get_name() + "_" + standard_itr.standard_filename;
                 if (detector_num != -1)
                 {
                     full_path += std::to_string(detector_num);
@@ -446,7 +448,7 @@ bool perform_quantification(data_struct::Analysis_Job<double>* analysis_job, boo
 
     std::vector<std::string> quant_scaler_name_list = { STR_SR_CURRENT, STR_US_IC, STR_DS_IC };
 
-    if( io::file::load_quantification_standardinfo(analysis_job->dataset_directory, analysis_job->quantification_standard_filename, analysis_job->standard_element_weights) )
+    if( io::file::load_quantification_standardinfo(analysis_job->output_dir, analysis_job->quantification_standard_filename, analysis_job->standard_element_weights) )
     {
         for(size_t detector_num : analysis_job->detector_num_arr)
         {
@@ -466,8 +468,8 @@ bool perform_quantification(data_struct::Analysis_Job<double>* analysis_job, boo
 
                     logI << Fitting_Routine_To_Str.at(fit_itr.first) << " " << quant_itr.first << "\n";
                     Fit_Parameters<double> fit_params;
-                    // min, and max values doen't matter because we are free fitting in mpfit and lmfit
-                    fit_params.add_parameter(Fit_Param<double>("quantifier", 0.0, std::numeric_limits<double>::max(), 1.0, 0.0001, E_Bound_Type::FIT));
+                    // min, and max values doen't matter because we are free fitting amplitude only
+                    fit_params.add_parameter(Fit_Param<double>("quantifier", 0.0, std::numeric_limits<double>::max()/2.0, 1.0, 0.0001, E_Bound_Type::FIT));
                     //initial guess: parinfo_value[0] = 100000.0 / factor
                     fit_params["quantifier"].value = (double)100000.0 / quant_itr.second;
                     optimizer->minimize_quantification(&fit_params, &detector->all_element_quants[fit_itr.first][quant_itr.first], &quantification_model);
@@ -489,7 +491,7 @@ bool perform_quantification(data_struct::Analysis_Job<double>* analysis_job, boo
 
             if (save_when_done)
             {
-                io::file::save_quantification_plots(analysis_job->dataset_directory, detector);
+                io::file::save_quantification_plots(analysis_job->output_dir, detector);
             }
         }
     }
@@ -520,7 +522,7 @@ bool perform_quantification(data_struct::Analysis_Job<double>* analysis_job, boo
                     dataset_file = dataset_file.substr(didx + 1);
                 }
 
-                std::string full_save_path = analysis_job->dataset_directory + DIR_END_CHAR + "img.dat" + DIR_END_CHAR + dataset_file;
+                std::string full_save_path = analysis_job->output_dir + DIR_END_CHAR + "img.dat" + DIR_END_CHAR + dataset_file;
 
                 size_t fn_str_len = dataset_file.length();
                 if (fn_str_len > 5 &&
@@ -571,7 +573,7 @@ bool find_and_optimize_roi(data_struct::Analysis_Job<double>& analysis_job,
                             Callback_Func_Status_Def* status_callback)
 {
     int cnt = int_spectra_map.count(search_filename);
-    std::vector<std::string> files = io::file::File_Scan::inst()->find_all_dataset_files(analysis_job.dataset_directory + "img.dat", search_filename);
+    std::vector<std::string> files = io::file::File_Scan::inst()->find_all_dataset_files(analysis_job.output_dir + "img.dat", search_filename);
     if (files.size() > 0 || cnt > 0)
     {
         std::string sfile_name;
@@ -579,7 +581,7 @@ bool find_and_optimize_roi(data_struct::Analysis_Job<double>& analysis_job,
         {
             data_struct::Spectra<double> int_spectra;
 
-            std::string file_path = analysis_job.dataset_directory + "img.dat" + DIR_END_CHAR; 
+            std::string file_path = analysis_job.output_dir + "img.dat" + DIR_END_CHAR; 
             if (cnt > 0)
             {
                 int_spectra = int_spectra_map.at(search_filename);
@@ -752,7 +754,7 @@ void optimize_single_roi(data_struct::Analysis_Job<double>& analysis_job,
 
     if (roi_file_name[slen - 4] == '.' && roi_file_name[slen - 3] == 'r' && roi_file_name[slen - 2] == '0' && roi_file_name[slen - 1] == 'i')
     {
-        if (io::file::aps::load_v10_rois(analysis_job.dataset_directory + "rois" + DIR_END_CHAR + roi_file_name, rois, int_specs))
+        if (io::file::aps::load_v10_rois(analysis_job.output_dir + "rois" + DIR_END_CHAR + roi_file_name, rois, int_specs))
         {
             for (size_t detector_num : analysis_job.detector_num_arr)
             {
@@ -797,7 +799,7 @@ void optimize_single_roi(data_struct::Analysis_Job<double>& analysis_job,
     }
     else
     {
-        if (io::file::aps::load_v9_rois(analysis_job.dataset_directory + "rois" + DIR_END_CHAR + roi_file_name, rois))
+        if (io::file::aps::load_v9_rois(analysis_job.output_dir + "rois" + DIR_END_CHAR + roi_file_name, rois))
         {
             logI << "Loaded roi file " << roi_file_name << "\n";
             //get dataset file number
@@ -857,9 +859,9 @@ void optimize_rois(data_struct::Analysis_Job<double>& analysis_job)
      //       detector_num        file_name_roi           fit_params
     std::map<int, std::map<std::string, data_struct::Fit_Parameters<double>>> roi_fit_params;
     // old v9 format
-    std::vector<std::string> files_to_proc = io::file::File_Scan::inst()->find_all_dataset_files(analysis_job.dataset_directory + "rois", ".roi");
+    std::vector<std::string> files_to_proc = io::file::File_Scan::inst()->find_all_dataset_files(analysis_job.output_dir + "rois", ".roi");
     // new roi format
-    std::vector<std::string> r0i_files = io::file::File_Scan::inst()->find_all_dataset_files(analysis_job.dataset_directory + "rois", ".r0i");
+    std::vector<std::string> r0i_files = io::file::File_Scan::inst()->find_all_dataset_files(analysis_job.output_dir + "rois", ".r0i");
 
     for (auto itr : r0i_files)
     {
@@ -874,8 +876,8 @@ void optimize_rois(data_struct::Analysis_Job<double>& analysis_job)
     // save all to csv
     for (auto detector_num : analysis_job.detector_num_arr)
     {
-        std::string save_path = analysis_job.dataset_directory + "output/specfit_results" + std::to_string(detector_num) + ".csv";
-        std::string quant_save_path = analysis_job.dataset_directory + "output/specfit_results" + std::to_string(detector_num) + "_quantified.csv";
+        std::string save_path = analysis_job.output_dir + "output/specfit_results" + std::to_string(detector_num) + ".csv";
+        std::string quant_save_path = analysis_job.output_dir + "output/specfit_results" + std::to_string(detector_num) + "_quantified.csv";
         io::file::csv::save_v9_specfit(save_path, roi_fit_params.at(detector_num));
         if (analysis_job.get_detector(detector_num)->quantification_standards.size() > 0)
         {

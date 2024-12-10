@@ -57,13 +57,13 @@ namespace data_struct
 template<typename T_real>
 Analysis_Job<T_real>::Analysis_Job()
 {
-    _optimizer = &_lmfit_optimizer;
+    _optimizer = &_nlopt_optimizer;
     optimize_fit_routine = OPTIMIZE_FIT_ROUTINE::ALL_PARAMS;
     _last_init_sample_size = 0;
 	_first_init = true;
     num_threads = std::thread::hardware_concurrency();
     //default mode for which parameters to fit when optimizing fit parameters
-    optimize_fit_params_preset = fitting::models::Fit_Params_Preset::BATCH_FIT_NO_TAILS;
+    optimize_fit_params_preset = fitting::models::Fit_Params_Preset::BATCH_FIT_WITH_TAILS;
     quick_and_dirty = false;
     generate_average_h5 = false;
     add_v9_layout = false;
@@ -86,6 +86,7 @@ Analysis_Job<T_real>::Analysis_Job()
 	update_ds_amps_str = "";
 	update_quant_us_amps_str = "";
 	update_quant_ds_amps_str = "";
+    output_dir = "";
 }
 
 //-----------------------------------------------------------------------------
@@ -163,15 +164,14 @@ void Analysis_Job<T_real>::init_fit_routines(size_t spectra_samples,  bool force
 template<typename T_real>
 void Analysis_Job<T_real>::set_optimizer(std::string optimizer)
 {
-    if(optimizer == "mpfit")
+    std::transform(optimizer.begin(), optimizer.end(), optimizer.begin(), [](unsigned char c) { return std::toupper(c); }); 
+    if(_optimizer->set_algorithm(optimizer))
     {
-        logI << "Setting optimizer to MPFIT\n";
-        _optimizer = &_mpfit_optimizer;
+        logI << "Setting optimizer to "<<optimizer<<"\n";
     }
     else
     {
-        logI << "Setting optimizer to LMFIT\n";
-        _optimizer = &_lmfit_optimizer;
+        logI << "Setting optimizer to LN_SBPLX\n";
     }
 }
 

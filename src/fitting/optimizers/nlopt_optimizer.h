@@ -1,7 +1,7 @@
 /***
-Copyright (c) 2016, UChicago Argonne, LLC. All rights reserved.
+Copyright (c) 2024, UChicago Argonne, LLC. All rights reserved.
 
-Copyright 2016. UChicago Argonne, LLC. This software was produced
+Copyright 2024. UChicago Argonne, LLC. This software was produced
 under U.S. Government contract DE-AC02-06CH11357 for Argonne National
 Laboratory (ANL), which is operated by UChicago Argonne, LLC for the
 U.S. Department of Energy. The U.S. Government has rights to use,
@@ -47,11 +47,12 @@ POSSIBILITY OF SUCH DAMAGE.
 
 
 
-#ifndef LMFit_Optimizer_H
-#define LMFit_Optimizer_H
+#ifndef NLOPT_Optimizer_H
+#define NLOPT_Optimizer_H
 
 #include "fitting/optimizers/optimizer.h"
-#include "support/lmfit_6.1/lmmin.hpp"
+#include <math.h>
+#include <nlopt.hpp>
 
 namespace fitting
 {
@@ -60,35 +61,37 @@ namespace optimizers
 
 using namespace data_struct;
 
-/**
- * @brief The LMFit_Optimizer class : Minimization class to find optimal specta model
- */
 template<typename T_real>
-class DLL_EXPORT LMFit_Optimizer: public Optimizer<T_real>
+class DLL_EXPORT NLOPT_Optimizer: public Optimizer<T_real>
 {
 public:
-    LMFit_Optimizer();
+    NLOPT_Optimizer();
 
-    virtual ~LMFit_Optimizer() {}
+    virtual ~NLOPT_Optimizer() {}
 
     virtual OPTIMIZER_OUTCOME minimize(Fit_Parameters<T_real>*fit_params,
-                                      const Spectra<T_real>* const spectra,
-                                      const Fit_Element_Map_Dict<T_real>* const elements_to_fit,
-                                      const Base_Model<T_real>* const model,
-                                      const Range energy_range,
-                                      bool use_weights,
-                                      Callback_Func_Status_Def* status_callback = nullptr);
+                                        const Spectra<T_real>* const spectra,
+                                        const Fit_Element_Map_Dict<T_real>* const elements_to_fit,
+                                        const Base_Model<T_real>* const model,
+                                        const Range energy_range,
+                                        bool use_weights,
+                                        Callback_Func_Status_Def* status_callback = nullptr);
 
-    virtual OPTIMIZER_OUTCOME minimize_func(Fit_Parameters<T_real>*fit_params,
-                                           const Spectra<T_real>* const spectra,
-                                           const Range energy_range,
-                                           const ArrayTr<T_real>* background,
-                                           Gen_Func_Def<T_real> gen_func,
-                                           bool use_weights);
+    virtual OPTIMIZER_OUTCOME minimize_func(const Base_Model<T_real>* const model,
+                                            Fit_Parameters<T_real>*fit_params,
+                                            const Spectra<T_real>* const spectra,
+                                            const Range energy_range,
+                                            const ArrayTr<T_real>* background,
+                                            Gen_Func_Def<T_real> gen_func,
+                                            bool use_weights);
 
     virtual OPTIMIZER_OUTCOME minimize_quantification(Fit_Parameters<T_real>*fit_params,
-                                                    std::unordered_map<std::string, Element_Quant<T_real>*> * quant_map,
-                                                    quantification::models::Quantification_Model<T_real>* quantification_model);
+                                                     std::unordered_map<std::string, Element_Quant<T_real>*> * quant_map,
+                                                     quantification::models::Quantification_Model<T_real>* quantification_model);
+
+    virtual std::vector<std::string> get_algorithm_list();
+
+    virtual bool set_algorithm(std::string name);
 
     virtual std::unordered_map<std::string, T_real> get_options();
 
@@ -97,12 +100,16 @@ public:
     virtual std::string detailed_outcome(int outcome);
 
 private:
+  std::unordered_map<std::string, nlopt::algorithm> _algorithms;
+  
+  std::unordered_map<std::string, T_real> _options;
 
-    struct lm_control_struct<T_real> _options;
+  nlopt::algorithm _algo;
+
 };
 
 } //namespace optimizers
 
 } //namespace fitting
 
-#endif // LMFit_Optimizer_H
+#endif // NLOPT_Optimizer_H

@@ -135,6 +135,24 @@ std::vector<T_real> Fit_Parameters<T_real>::to_array()
 //-----------------------------------------------------------------------------
 
 template<typename T_real>
+void Fit_Parameters<T_real>::to_array_with_bounds(std::vector<double>& fitp, std::vector<double>&lb, std::vector<double>& ub, std::vector<double>& step )
+{
+    for(const auto& itr : _params)
+    {
+        if (itr.second.bound_type != E_Bound_Type::FIXED)
+        {
+            _params[itr.first].opt_array_index = fitp.size();
+            fitp.push_back(static_cast<double>(itr.second.value));
+            lb.push_back(static_cast<double>(itr.second.min_val));
+            ub.push_back(static_cast<double>(itr.second.max_val));
+            step.push_back(static_cast<double>(itr.second.step_size));
+        }
+    }
+}
+
+//-----------------------------------------------------------------------------
+
+template<typename T_real>
 std::vector<std::string> Fit_Parameters<T_real>::names_to_array()
 {
     std::vector<std::string> arr;
@@ -182,6 +200,21 @@ void Fit_Parameters<T_real>::from_array(std::vector<T_real> &arr)
 {
     from_array(&arr[0], arr.size());
 }
+
+//-----------------------------------------------------------------------------
+
+template<typename T_real>
+void Fit_Parameters<T_real>::from_array_d(const std::vector<double> &arr)
+{
+    for(auto& itr : _params)
+    {
+        if (itr.second.opt_array_index > -1 && itr.second.opt_array_index < (int)arr.size())
+        {
+            itr.second.value = arr[itr.second.opt_array_index];
+        }
+    }
+}
+
 
 //-----------------------------------------------------------------------------
 
@@ -250,7 +283,7 @@ void Fit_Parameters<T_real>::set_all_except(E_Bound_Type btype,const std::vector
 //-----------------------------------------------------------------------------
 
 template<typename T_real>
-void Fit_Parameters<T_real>::update_values(const Fit_Parameters<T_real>  *override_fit_params)
+void Fit_Parameters<T_real>::update_values(const Fit_Parameters<T_real>  * const override_fit_params)
 {
     for(auto& itr : _params)
     {
@@ -260,17 +293,33 @@ void Fit_Parameters<T_real>::update_values(const Fit_Parameters<T_real>  *overri
             {
                 itr.second.value = override_fit_params->at(itr.first).value;
             }
+            else
+            {
+                logW << itr.first << "new value = " << override_fit_params->at(itr.first).value << " Reverting to original value "<< itr.second.value << " .\n";
+            }
             if( std::isfinite(override_fit_params->at(itr.first).min_val) )
             {
                 itr.second.min_val = override_fit_params->at(itr.first).min_val;
+            }
+            else
+            {
+                //logW << itr.first << "new min_val = " << override_fit_params->at(itr.first).min_val << " Reverting to original min_val "<< itr.second.min_val << " . Not updating min_val\n";
             }
             if( std::isfinite(override_fit_params->at(itr.first).max_val) )
             {
                 itr.second.max_val = override_fit_params->at(itr.first).max_val;
             }
+            else
+            {
+                //logW << itr.first << " max_val = " << itr.second.max_val << " . Not updating max_val\n";
+            }
             if( override_fit_params->at(itr.first).bound_type != E_Bound_Type::NOT_INIT)
             {
                 itr.second.bound_type = override_fit_params->at(itr.first).bound_type;
+            }
+            else
+            {
+                //logW << itr.first << " bound_type == E_Bound_Type::NOT_INIT. Not updating bound_type\n";
             }
         }
     }
@@ -344,10 +393,33 @@ void Fit_Parameters<T_real>::update_value_to_constraints()
 template<typename T_real>
 void Fit_Parameters<T_real>::print()
 {
-    logit_s << "     Name  \t value  \t min  \t max  \t step size \t fitting\n\n";
+    logit_s << "     Name                   value                min                max  \t step size \t fitting\n\n";
     for(const auto& itr : _params)
     {
-        logit_s<<" "<<itr.first<<" \t "<<itr.second.value<<" \t " << itr.second.min_val << " \t " << itr.second.max_val << " \t " << itr.second.step_size << " \t " <<itr.second.bound_type_str() << "\n";
+        // 22 is len of longest name COHERENT_SCT_AMPLITUDE 
+        int spaces = 24 - itr.first.length();
+        std::string name = itr.first;
+        name.append(spaces, ' ');
+        std::string value = std::to_string(itr.second.value);
+        spaces = 10 - value.length();
+        value.append(spaces, ' ');
+        std::string smin = std::to_string(itr.second.min_val);
+        spaces = 10 - smin.length();
+        smin.append(spaces, ' ');
+        std::string smax = std::to_string(itr.second.max_val);
+        spaces = 10 - smax.length();
+        smax.append(spaces, ' ');
+        std::string step = std::to_string(itr.second.step_size);
+        spaces = 10 - step.length();
+        step.append(spaces, ' ');
+        if(itr.second.value > itr.second.max_val || itr.second.value < itr.second.min_val)
+        {
+            logit_s<<"\033[1;31m "<<" "<<name<<" "<<value<<"\t\t" <<smin << " \t " << smax << " \t " << step << " \t " <<itr.second.bound_type_str() << "\033[0;m \n";    
+        }
+        else
+        {
+            logit_s<<" "<<name<<" "<<value<<"\t\t" << smin << " \t " << smax << " \t " << step << " \t " <<itr.second.bound_type_str() << "\n";
+        }
     }
     logit_s<<"\n";
 
@@ -362,7 +434,14 @@ void Fit_Parameters<T_real>::print_non_fixed()
     {
         if(itr.second.bound_type != E_Bound_Type::FIXED)
         {
-            logit_s<<" [ "<<itr.first<<" ] = "<<itr.second.value<<"  "<<itr.second.bound_type_str() << "\n";
+            if(itr.second.value > itr.second.max_val || itr.second.value < itr.second.min_val)
+            {
+                logit_s<<"\033[1;31m [ "<<itr.first<<" ] = "<<itr.second.value<<"  "<<itr.second.bound_type_str() << "\033[0;m \n";    
+            }
+            else
+            {
+                logit_s<<" [ "<<itr.first<<" ] = "<<itr.second.value<<"  "<<itr.second.bound_type_str() << "\n";
+            }
         }
     }
     logit_s<<"\n";

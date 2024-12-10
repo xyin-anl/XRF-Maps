@@ -57,6 +57,9 @@ namespace routines
 {
 
 template<typename T_real>
+std::mutex Matrix_Optimized_Fit_Routine<T_real>::_int_spec_mutex;
+
+template<typename T_real>
 NNLS_Fit_Routine<T_real>::NNLS_Fit_Routine() : Matrix_Optimized_Fit_Routine<T_real>()
 {
 
@@ -158,18 +161,6 @@ void NNLS_Fit_Routine<T_real>::fit_spectrum_model(const Spectra<T_real>* const s
         }
     }
 
-    /*
-    static int i = 0;
-    string path = "c:\\temp\\debug\\img" + ::to_string(i) + ".png";
-    ArrayTr<T_real> sub_background = *background;
-    T_real energy_offset = 0;
-    T_real energy_slope = 0.01;
-    T_real energy_quad = 0;
-
-    ArrayTr<T_real> energy = ArrayTr<T_real>::LinSpaced(this->_energy_range.count(), this->_energy_range.min, this->_energy_range.max);
-    ArrayTr<T_real> ev = energy_offset + (energy * energy_slope) + (pow(energy, (T_real)2.0) * energy_quad);
-    visual::SavePlotSpectrasFromConsole(path, &ev, &spectra_sub_background, spectra_model, &sub_background, true);
-    */
 }
 
 // ----------------------------------------------------------------------------
@@ -210,10 +201,6 @@ OPTIMIZER_OUTCOME NNLS_Fit_Routine<T_real>::fit_spectra(const models::Base_Model
 
     Spectra<T_real> spectra_model = background;
 
-	//Spectra spectra_model(this->_energy_range.count());
-	//ArrayTr<T_real> rhs = spectra->sub_spectra(this->_energy_range.min, this->_energy_range.count());
-	//nsNNLS::nnls<T_real> solver(&_fitmatrix, &rhs, _max_iter);
-
     solver.optimize(num_iter, npg);
     if (num_iter < 0)
     {
@@ -222,7 +209,7 @@ OPTIMIZER_OUTCOME NNLS_Fit_Routine<T_real>::fit_spectra(const models::Base_Model
 
     result = solver.getSolution();
 
-    for(const auto& itr : *elements_to_fit)
+    for(const auto& itr : this->_element_models)
     {
         if (std::isfinite((*result)[_element_row_index[itr.first]]))
         {
@@ -242,6 +229,15 @@ OPTIMIZER_OUTCOME NNLS_Fit_Routine<T_real>::fit_spectra(const models::Base_Model
             out_counts[itr.first] = 0.;
         }
     }
+    // add escape peak
+    if (fit_params.at(STR_SI_ESCAPE).value > 0.0 && model != nullptr)
+    {
+        ArrayTr<T_real> energy = ArrayTr<T_real>::LinSpaced(this->_energy_range.count(), this->_energy_range.min, this->_energy_range.max);
+        ArrayTr<T_real> ev = fit_params.value(STR_ENERGY_OFFSET) + (energy * fit_params.value(STR_ENERGY_SLOPE)) + (pow(energy, (T_real)2.0) * fit_params.value(STR_ENERGY_QUADRATIC));
+
+        spectra_model += model->escape_peak(spectra_model, ev, fit_params.value(STR_SI_ESCAPE));
+    }
+
 
     out_counts[STR_NUM_ITR] = static_cast<T_real>(num_iter);
     out_counts[STR_RESIDUAL] = npg;

@@ -404,10 +404,14 @@ DLL_EXPORT bool init_analysis_job_detectors(data_struct::Analysis_Job<T_real>* a
 
         override_params->dataset_directory = analysis_job->dataset_directory;
         override_params->detector_num = detector_num;
-
-        if (false == io::file::load_override_params(analysis_job->dataset_directory, detector_num, override_params))
+        if(analysis_job->output_dir.length() == 0)
         {
-            if (false == io::file::load_override_params(analysis_job->dataset_directory, -1, override_params))
+            analysis_job->output_dir = analysis_job->dataset_directory;
+        }
+
+        if (false == io::file::load_override_params(analysis_job->output_dir, detector_num, override_params))
+        {
+            if (false == io::file::load_override_params(analysis_job->output_dir, -1, override_params))
             {
                 //last case, check current directory for override. This will be used for streaming
                 if (false == io::file::load_override_params("./", detector_num, override_params))
@@ -1051,12 +1055,24 @@ DLL_EXPORT bool load_spectra_volume(std::string dataset_directory,
         std::string file_title;
         data_struct::Scan_Info<T_real> scan_info_edf;
         // try new APS-U format
-        if(true == io::file::HDF5_IO::inst()->load_spectra_vol_apsu(fullpath, file_title, spectra_volume, scan_info_edf))
+        if(true == io::file::HDF5_IO::inst()->load_spectra_vol_apsu(dataset_directory, dataset_file, detector_num, spectra_volume, scan_info_edf))
         {
-            // load scan rows from ./flyXRF
-
-            // load positions from ./positions
-        
+            return true;
+        }
+        if(true == io::file::HDF5_IO::inst()->load_spectra_vol_polar(dataset_directory, dataset_file, detector_num, spectra_volume, scan_info_edf))
+        {
+            std::string base_name = dataset_file;
+            base_name = dataset_file.substr(0, dataset_file.size()-3);
+            fullpath = dataset_directory + DIR_END_CHAR + "img.dat" + DIR_END_CHAR + base_name + ".h5" + std::to_string(detector_num);
+            if(io::file::HDF5_IO::inst()->start_save_seq(fullpath, true))
+            {
+                io::file::HDF5_IO::inst()->save_scan_scalers(detector_num, &scan_info_edf, params_override);
+                return true;
+            }
+            else
+            {
+                return false;
+            }
         }
         // try ESRF dataset
         else if(true == io::file::HDF5_IO::inst()->load_spectra_vol_esrf(fullpath, file_title, spectra_volume, scan_info_edf))
