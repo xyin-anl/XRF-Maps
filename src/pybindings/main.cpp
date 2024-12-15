@@ -37,6 +37,18 @@ namespace py = pybind11;
 
 //PYBIND11_MAKE_OPAQUE(std::vector<int>);
 
+auto fit_params(fitting::routines::Param_Optimized_Fit_Routine<float>* fit_route,
+    const fitting::models::Base_Model<float>* const model,
+    const Spectra<float>* const spectra,
+    const Fit_Element_Map_Dict<float>* const elements_to_fit,
+    bool use_weights,
+    Callback_Func_Status_Def* status_callback = nullptr)
+{
+    data_struct::Fit_Parameters<float> out_fit_params;
+    fit_route->fit_spectra_parameters(model, spectra, elements_to_fit, use_weights, out_fit_params, status_callback);
+    return out_fit_params;
+}
+
 auto fit_counts(fitting::routines::Base_Fit_Routine<float>* fit_route,
 	const fitting::models::Base_Model<float>* const model,
 	const Spectra<float>* const spectra,
@@ -591,14 +603,6 @@ PYBIND11_MODULE(pyxrfmaps, m) {
         {
             return self.model_spectrum(fit_params, elements_to_fit, nullptr, energy_range);
         })
-    .def("model_spectrum_info", &fitting::models::Gaussian_Model<float>::model_spectrum_info)
-    .def("model_spectrum_info_no_label", [](fitting::models::Gaussian_Model<float>& self,
-        const Fit_Parameters<float>* const fit_params,
-        const Fit_Element_Map_Dict<float>* const elements_to_fit,
-        const data_struct::Range energy_range)
-        {
-            return self.model_spectrum_info(fit_params, elements_to_fit, nullptr, energy_range);
-        })
 	.def("model_spectrum_mp", &fitting::models::Gaussian_Model<float>::model_spectrum_mp)
 	.def("model_spectrum_element", &fitting::models::Gaussian_Model<float>::model_spectrum_element)
     .def("model_spectrum_element_no_label", [](fitting::models::Gaussian_Model<float>& self,
@@ -616,11 +620,11 @@ PYBIND11_MODULE(pyxrfmaps, m) {
     //fitting optimizers
 	py::class_<fitting::optimizers::Optimizer<float>>(fo, "Optimizer");
 
-    py::class_<fitting::optimizers::NLOpt_Optimizer<float>, fitting::optimizers::Optimizer<float> >(fo, "nlopt")
+    py::class_<fitting::optimizers::NLOPT_Optimizer<float>, fitting::optimizers::Optimizer<float> >(fo, "nlopt")
     .def(py::init<>())
-    .def("minimize", &fitting::optimizers::LMFit_Optimizer<float>::minimize)
-    .def("minimize_func", &fitting::optimizers::LMFit_Optimizer<float>::minimize_func)
-    .def("minimize_quantification", &fitting::optimizers::LMFit_Optimizer<float>::minimize_quantification);
+    .def("minimize", &fitting::optimizers::NLOPT_Optimizer<float>::minimize)
+    .def("minimize_func", &fitting::optimizers::NLOPT_Optimizer<float>::minimize_func)
+    .def("minimize_quantification", &fitting::optimizers::NLOPT_Optimizer<float>::minimize_quantification);
 
     //routines
 	py::class_<fitting::routines::Base_Fit_Routine<float> >(fr, "base_fit_route");
@@ -653,6 +657,14 @@ PYBIND11_MODULE(pyxrfmaps, m) {
 	{
 		return fit_spectra(&self, model, spectra, elements_to_fit);
 	})
+        .def("fit_params", [](fitting::routines::Param_Optimized_Fit_Routine<float>& self,
+            const fitting::models::Base_Model<float>* const model,
+            const Spectra<float>* const spectra,
+            const Fit_Element_Map_Dict<float>* const elements_to_fit,
+            bool use_weights)
+    {
+        return fit_params(&self, model, spectra, elements_to_fit, use_weights);
+    })
 		.def("fit_counts", [](fitting::routines::Param_Optimized_Fit_Routine<float>& self,
 			const fitting::models::Base_Model<float>* const model,
 			const Spectra<float>* const spectra,
