@@ -1,106 +1,197 @@
-[![Actions Status](https://github.com/aglowacki/XRF-Maps/workflows/CMake/badge.svg)](https://github.com/aglowacki/XRF-Maps/actions)
-[![Build Status](https://dev.azure.com/aglow/XRF-Maps/_apis/build/status/aglowacki.XRF-Maps?branchName=master)](https://dev.azure.com/aglow/XRF-Maps/_build/latest?definitionId=2&branchName=master)
+> [!IMPORTANT]
+> This forked version focuses on the Python interface and may be slightly different from the upstream version.
 
 # XRF-Maps
 
-X-ray fluorescence (XRF) imaging typically involves the creation and analysis of 3D data sets, where at each scan position a full energy dispersive x-ray spectrum is recorded. This allows one to later process the data in a variety of different approaches, e.g., by spectral region of interest (ROI) summation with or without background subtraction, principal component analysis, or fitting. XRF-Maps is a C++ open source software package that implements these functions to provide a tool set for the analysis of XRF data sets. It is based on the MAPS software http://www.aps.anl.gov/Xray_Science_Division/Xray_Microscopy_and_Imaging/Software_and_Tools/maps.html
+X-ray fluorescence (XRF) imaging typically involves the creation and analysis of 3D data sets, where at each scan position a full energy dispersive x-ray spectrum is recorded. This allows one to later process the data in a variety of different approaches, e.g., by spectral region of interest (ROI) summation with or without background subtraction, principal component analysis, or fitting. `XRFMaps` is a C++ open source software package that implements these functions to provide a tool set for the analysis of XRF data sets. It is based on the original IDL implementation, [`MAPS`](https://www.aps.anl.gov/Microscopy/Software-and-Tools-MAPS). Recently, a differentiable PyTorch-based implementation, [`MapsTorch`](https://github.com/xyin-anl/MapsTorch) has been developed that enables Automatic Differentiation (AD)-based XRF fitting and data analysis.
 
-# Compiling
-
-## Requires
-
-Visual Studio 2015 or greater (Windows build)
-GCC 6.0 or greater (Linux build)
-Cmake 3.5 or greater
-
-## Libraries
-
-HDF5 : https://www.hdfgroup.org/downloads/
-NetCDF : http://www.unidata.ucar.edu/downloads/netcdf/index.jsp (Download http://www.unidata.ucar.edu/software/netcdf/docs/winbin.html)
-Eigen : http://eigen.tuxfamily.org/index.php?title=Main_Page (submodule in src/support)
-
-## Optional Libraries
-
-QT : https://www.qt.io/download
-ZeroMQ : http://zeromq.org/area:download
-
-## Compile Default
-
-1) git clone --recurse-submodules https://github.com/AdvancedPhotonSource/XRF-Maps.git
-2) cd XRF-Maps
-3) mkdir build
-4) cd vcpkg
-5) vcpkg set Linux
-   1) ./bootstrap-vcpkg.sh
-   2) ./vcpkg install hdf5 netcdf-c yaml-cpp cppzmq nlopt jsoncpp
-6) vcpkg setup windows
-   1) .\bootstrap-vcpkg.bat
-   2) .\vcpkg install hdf5 netcdf-c yaml-cpp cppzmq nlopt jsoncpp --triplet x64-windows
-7) cd ../build
-8) cmake `-DCMAKE_TOOLCHAIN_FILE=../vcpkg/scripts/buildsystems/vcpkg.cmake -DBUILD_WITH_ZMQ=ON ..`
-9) make
-
-## Building optional features
-
-### QT support
-
--DBUILD_WITH_QT=ON
-
-### Streaming support with ZeroMQ
-
--DBUILD_WITH_ZMQ=ON 
-
-### Python bindings (NOTE: this may interfere with QT options if QT lib version is different than python qt lib version as with anaconda python)
-
--DBUILD_WITH_PYBIND11=ON
--DPYTHON_EXECUTABLE={path to python.exe if not found}
-
-# Data Analysis
-
-## General
-Run from bin directory. The software looks for references one directory up ( ../references ). 
+# Compiling on Linux with Python bindings
 ```bash
-Help:
-Usage: xrf_maps [Options] --dir [dataset directory]
-
-Options:
---nthreads : <int> number of threads to use (default is all system threads)
---quantify-with : <standard.txt> File to use as quantification standard
---detectors : <int,..> Detectors to process, Defaults to 0,1,2,3 for 4 detector
---generate-avg-h5 : Generate .h5 file which is the average of all detectors .h50 - h.53 or range specified.
---add-v9layout : Generate .h5 file which has v9 layout able to open in IDL MAPS software.
---add-exchange : Add exchange group into hdf5 file with normalized data.
---export-csv : Export Integrated spec, fitted, background to csv file.
---update-theta : <theta_pv_string> Update the theta dataset value using theta_pv_string as new pv string ref.
---update-amps <us_amp>,<ds_amp>: Updates upstream and downstream amps if they changed inbetween scans.
---update-quant-amps <us_amp>,<ds_amp>: Updates upstream and downstream amps for quantification if they changed inbetween scans.
---quick-and-dirty : Integrate the detector range into 1 spectra.
---optimize-fit-override-params : <int> Integrate the 8 largest mda datasets and fit with multiple params.
-  1 = matrix batch fit
-  2 = batch fit without tails
-  3 = batch fit with tails
-  4 = batch fit with free E, everything else fixed
---optimizer <lmfit, mpfit> : Choose which optimizer to use for --optimize-fit-override-params or matrix fit routine
-Fitting Routines:
---fit <routines,> comma seperated
-  roi : element energy region of interest
-  roi_plus : SVD method
-  nnls : Non-Negative Least Squares
-  tails : Fit with multiple parameters
-  matrix : Fit with locked parameters
-
-Dataset:
---dir : Dataset directory
---files : Dataset files: comma (',') separated if multiple
-Network:
---streamin [source ip] : Accept a ZMQ stream of spectra to process. Source ip defaults to localhost (must compile with -DBUILD_WITH_ZMQ option)
---streamout : Streams the analysis counts over a ZMQ stream (must compile with -DBUILD_WITH_ZMQ option)
-
-Examples:
-   Perform roi and matrix analysis on the directory /data/dataset1
-xrf_maps --fit roi,matrix --dir /data/dataset1
-   Perform roi and matrix analysis on the directory /data/dataset1 but only process scan1 and scan2
-xrf_maps --fit roi,matrix --dir /data/dataset1 --files scan1.mda,scan2.mda
-   Perform roi, matrix, and nnls  analysis on the directory /data/dataset1, use maps_standard.txt information for quantification
-xrf_maps --fit roi,matrix,nnls --quantify-with maps_standard.txt --dir /data/dataset1
+# Need gcc 6.0 or greater and cmake 3.5 or greater
+git clone --recurse-submodules https://github.com/xyin-anl/XRF-Maps.git
+cd XRF-Maps
+mkdir build
+cd vcpkg
+./bootstrap-vcpkg.sh
+./vcpkg install hdf5 netcdf-c yaml-cpp cppzmq nlopt jsoncpp
+cd ../build
+export PYTHON_BASE_DIR=/home/user/miniconda3/envs/mapstorch # Replace with your python base directory
+export PYTHON_VERSION=3.11 # Replace with your python version
+cmake -DCMAKE_TOOLCHAIN_FILE=../vcpkg/scripts/buildsystems/vcpkg.cmake -DBUILD_WITH_ZMQ=ON -DBUILD_WITH_PYBIND11=ON -DPYTHON_EXECUTABLE=$PYTHON_BASE_DIR/bin/python -DPYTHON_LIBRARY=$PYTHON_BASE_DIR/lib/libpython3.so -DPYTHON_INCLUDE_DIR=$PYTHON_BASE_DIR/include/python$PYTHON_VERSION ..
+make
 ```
+After compilation, you will see the Python module and `xrf_maps` executable in the bin directory. For other compiling options, please check upstream repository.
+
+# Python Interface
+
+The Python interface (`pyxrfmaps`) provides comprehensive bindings to the C++ library, enabling XRF data analysis directly from Python. Here's a detailed overview of the main components and their usage:
+
+## Core Components
+
+### Element Information Management
+```python
+import pyxrfmaps as px
+
+# Load element information from reference files
+px.load_element_info(element_henke_filename, element_csv_filename)
+
+# Access element info
+element_info_map = px.ElementInfoMap()
+element = element_info_map.get_element("Fe")  # Get by symbol
+element = element_info_map.get_element(26)    # Get by atomic number
+```
+
+### Data Structures
+
+#### Spectra Classes
+- `Spectra`: Single spectrum data structure
+- `Spectra_Line`: 1D array of spectra
+- `Spectra_Volume`: 2D array of spectra
+```python
+# Working with spectra
+spectra = px.Spectra()
+spectra_line = px.Spectra_Line()
+spectra_volume = px.Spectra_Volume()
+
+# Get dimensions
+rows = spectra_volume.rows()
+cols = spectra_volume.cols()
+samples = spectra_volume.samples_size()
+```
+
+#### Fitting Parameters
+```python
+# Create and manipulate fit parameters
+fit_params = px.Fit_Parameters()
+fit_params.add_parameter(px.Fit_Param("param_name", value))
+fit_params.update_values(new_values)
+```
+
+### Fitting Models and Routines
+
+#### Models
+The package provides Gaussian-based models for XRF spectrum fitting:
+```python
+# Create Gaussian model
+model = px.fitting.models.GaussModel()
+model.reset_to_default_fit_params()
+model.update_fit_params_values(fit_params)
+```
+
+#### Fitting Routines
+Several fitting routines are available:
+```python
+# ROI-based fitting
+roi_routine = px.fitting.routines.roi()
+
+# Parameter-optimized fitting
+param_routine = px.fitting.routines.param_optimized()
+
+# Matrix-based fitting
+matrix_routine = px.fitting.routines.matrix()
+
+# Non-negative least squares fitting
+nnls_routine = px.fitting.routines.nnls()
+
+# SVD-based fitting
+svd_routine = px.fitting.routines.svd()
+```
+
+#### Optimizers
+```python
+# NLOPT optimizer
+optimizer = px.fitting.optimizers.nlopt()
+fit_routine.set_optimizer(optimizer)
+```
+
+### Working with Files
+
+#### Loading and Saving Data
+```python
+# Load dataset
+filename = "dataset.h5"
+spectra_volume = px.load_spectra_volume(filename)
+
+# Save results
+px.io.file.hdf5_save_element_fits(output_path, element_counts, row_start, row_end, col_start, col_end)
+```
+
+### Workflow Components
+
+The package provides workflow components for processing streaming data:
+```python
+# Create file source for streaming processing
+source = px.SpectraFileSource()
+source.set_init_fitting_routines(True)
+
+# Create network streamer for distributed processing
+streamer = px.SpectraNetStreamer("tcp://localhost:5555")
+streamer.set_send_spectra(True)
+```
+
+## Complete Example
+
+Here's a complete example showing how to perform XRF fitting on a dataset:
+
+```python
+import pyxrfmaps as px
+
+element_csv_filename = "/reference/xrf_library.csv"
+element_henke_filename = "/reference/henke.xdr"
+detector_num = 0
+dataset_dir = '/example_dataset/'
+dataset = 'bnp_fly0001.mda.h50'
+full_path = dataset_dir + 'img.dat/' + dataset
+
+# initialize element info
+px.load_element_info(element_henke_filename, element_csv_filename)
+
+# Load dataset
+int_spec = load_dataset(full_path)
+
+# Load fit parameters 
+po = px.load_override_params(dataset_dir, detector_num, True)
+
+# Use Gausian-based Model
+model = px.fitting.models.GaussModel()
+
+# Select fitting routine and optimizer
+fit_rout = px.fitting.routines.param_optimized()
+opt = px.fitting.optimizers.nlopt()
+fit_rout.set_optimizer(opt)
+
+# Initialize model and fit routine with fit parameters
+energy_range = px.get_energy_range(int_spec.size, po.fit_params)
+model.update_fit_params_values(po.fit_params)
+fit_rout.initialize(model, po.elements_to_fit, energy_range)
+
+# Fit parameters
+params = fitting_routine.fit_params(model, int_spec, po.elements_to_fit, False)
+
+# You may need to manually update override parameter files here 
+
+# Fit element counts
+counts = fit_rout.fit_counts(model, int_spec, po.elements_to_fit)
+
+# Get Fit Spectra 
+fit_spec = fit_rout.fit_spectra(model, int_spec, po.elements_to_fit)
+
+# Resize int_spec to match fit_spec
+int_spec = int_spec[energy_range.min:energy_range.max+1]
+```
+
+## Additional Features
+
+### Background Subtraction
+```python
+# Perform SNIP background subtraction
+background = px.snip_background(spectra, width, energy_offset, energy_slope, energy_quad, first_width, max_iterations)
+```
+
+### Quantification
+```python
+# Perform quantification analysis
+px.perform_quantification(params_override, element_counts, quantification_standards)
+```
+
+For more advanced usage, please refer to `src/pybindings/main.cpp` and the upstream repository.
