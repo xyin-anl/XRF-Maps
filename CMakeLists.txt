@@ -54,7 +54,7 @@ set(VCPKG_CRT_LINKAGE dynamic)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/" ${PROJECT_SOURCE_DIR}/../libs/libzmq/build ${PROJECT_SOURCE_DIR}/cmake)
 set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${PROJECT_SOURCE_DIR}/../libs/libzmq/build)
 
-option(BUILD_WITH_TIRPC "Build tripc library for libxrpc (RedHat 8)" ON)
+option(BUILD_WITH_TIRPC "Build tripc library for libxrpc (RedHat 8)" OFF)
 
 IF(UNIX)
   IF(BUILD_WITH_TIRPC)
