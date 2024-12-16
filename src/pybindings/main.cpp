@@ -6,7 +6,6 @@
 #include <pybind11/chrono.h>
 #include <pybind11/functional.h>
 #include <pybind11/eigen.h>
-#include <pybind11/eigen/tensor.h>
 
 #if defined _WIN32 || defined __CYGWIN__
   #ifdef _BUILD_WITH_ZMQ
@@ -191,8 +190,7 @@ PYBIND11_MODULE(pyxrfmaps, m) {
         .def("rows", &data_struct::Spectra_Volume<float>::rows)
         .def("recalc_elapsed_livetime", &data_struct::Spectra_Volume<float>::recalc_elapsed_livetime)
         .def("samples_size", &data_struct::Spectra_Volume<float>::samples_size)
-        .def("rank", &data_struct::Spectra_Volume<float>::rank)
-        .def("get_sv_tensor", &data_struct::Spectra_Volume<float>::get_sv_tensor);
+        .def("rank", &data_struct::Spectra_Volume<float>::rank);
 
     py::class_<data_struct::Element_Info<float>>(m, "ElementInfo")
     .def(py::init<>())

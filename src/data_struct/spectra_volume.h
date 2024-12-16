@@ -52,7 +52,6 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include "data_struct/spectra_line.h"
 #include "scan_info.h"
-#include "unsupported/Eigen/CXX11/Tensor"
 
 namespace data_struct
 {
@@ -89,8 +88,6 @@ public:
 	size_t samples_size() const { if (_data_vol.size() > 0) return _data_vol[0][0].size(); else return 0; }
 
     int rank() { return 3; }
-
-    Eigen::Tensor<T_real, 3> get_sv_tensor();
 
 private:
 
