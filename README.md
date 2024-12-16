@@ -23,6 +23,8 @@ make
 ```
 
 After compilation, you will see the Python module and `xrf_maps` executable in the bin directory. For other compiling options, please check upstream repository.
+For mac os, if you intend to relocate the compiled dynamic libraries, you can use [`install_name_tool`](https://matthew-brett.github.io/docosx/mac_runtime_link.html#) to change the linked library locations of the executable. For example, `install_name_tool -change /Users/user/Repos/XRF-Maps/bin/libxrf_fit.dylib @loader_path/libxrf_fit.dylib pyxrfmaps.cpython-310-darwin.so` and `install_name_tool -change /Users/user/Repos/XRF-Maps/bin/libxrf_io.dylib @loader_path/libxrf_io.dylib pyxrfmaps.cpython-310-darwin.so`. 
+When importing `pyxrfmaps`, in newer MacOS systems, you need to go to System Settings->Privacy\&Security, scoll down to the Security section and enable loading the dynamic libraries. 
 
 # Python Interface
 
